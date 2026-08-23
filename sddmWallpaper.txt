@@ -1,0 +1,9 @@
+sudo vim /usr/share/sddm/themes/sddm-astronaut-theme/metadata.desktop
+command to change the wallpaper. change the wallpaper
+
+
+
+ sddm-greeter-qt6 --test-mode \
+  --theme /usr/share/sddm/themes/sddm-astronaut-theme/
+test the sddm wallpaper login screen
+

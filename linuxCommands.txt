@@ -1,0 +1,8 @@
+systemctl --user restart pipewire pulse:
+   This only flushes and restarts your audio streams. Your screen will not flicker.
+   The only side effect is that any audio currently playing will pause or mute for about 1 to 2 seconds while
+   the sound card reinitializes.
+
+sudo systemctl restart NetworkManager:
+   This only restarts the background service managing your internet connections. Your display is completely safe.
+   The only side effect is that your Wi-Fi or Ethernet will disconnect for about 3 to 5 seconds before automatically reconnecting.
