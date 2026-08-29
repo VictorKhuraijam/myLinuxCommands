@@ -1,0 +1,141 @@
+## Swapped Caps Lock and Esc keys
+
+What I changed:
+Physical Caps Lock key now acts as Esc, and physical Esc key now acts as Caps Lock.
+Applies system-wide (terminal, Neovim, browser, everywhere) — not just one app.
+
+Why:
+Esc is used constantly in Neovim (leaving insert mode). The default Esc key
+is in the far top-left corner, requiring a big hand movement. Caps Lock sits
+on home row next to the left pinky, so swapping makes Esc much faster to
+reach and cuts down on repetitive strain. Caps Lock itself is rarely used
+on purpose anyway.
+
+How I did it:
+1. Installed keyd (in the official Arch 'extra' repo):
+   sudo pacman -S keyd
+
+2. Created config file:
+   sudo nvim /etc/keyd/default.conf
+
+   Contents:
+   [ids]
+   *
+
+   [main]
+   capslock = esc
+   esc = capslock
+
+3. Enabled and started the service:
+   sudo systemctl enable --now keyd
+
+4. Verified it worked:
+   sudo keyd monitor
+   (pressed Caps Lock, confirmed it showed as "esc" on the
+   "keyd virtual keyboard" device, not raw "capslock" on the
+   physical keyboard device)
+
+To undo:
+Either delete /etc/keyd/default.conf or remove the two swap lines,
+then run: sudo keyd reload
+(Or fully remove: sudo systemctl disable --now keyd && sudo pacman -R keyd)
+
+
+
+## Blacklisted Nvidia (nouveau) GPU
+
+What I changed:
+Disabled the discrete Nvidia GeForce 920M GPU (blacklisted the nouveau
+driver) and installed bbswitch to power it off at the hardware level.
+
+Why:
+Laptop is Optimus-style (Intel HD 5500 + Nvidia 920M). Initially thought
+it only had Intel graphics (lspci grep missed the Nvidia line). System
+had an unexpected shutdown while on AC power under light load, laptop
+felt unusually hot beforehand. nouveau has known poor power management
+for this Kepler-generation chip, likely contributing to the overheating/
+shutdown. Since the 920M isn't needed for this use case, disabling it
+avoids the power/thermal risk entirely.
+
+How I did it:
+1. Blacklisted nouveau (confirmed no more nouveau sensor entries after)
+2. Installed bbswitch — works when loaded manually, confirmed via ACPI
+   Optimus _DSM detection in dmesg (successfully powers off the GPU)
+3. Fixed bbswitch not loading automatically at boot: root cause was
+   writing to /etc/modules-load.conf, which systemd does NOT read on
+   Arch. Correct location is /etc/modules-load.d/bbswitch.conf
+
+To undo:
+Remove the nouveau blacklist entry, remove
+/etc/modules-load.d/bbswitch.conf, uninstall bbswitch, reboot.
+
+---
+
+## Fan control investigation (dell_smm)
+
+What I changed (in progress, not fully resolved):
+Investigated manual fan control via dell_smm_hwmon after the overheating
+incident above. pwmconfig failed with "Manual control mode not supported"
+on all 4 dell_smm pwm channels — driver's default restricted=1 safety
+flag was blocking writes.
+
+Why:
+Wanted to confirm fan behavior wasn't the cause of the earlier shutdown.
+Found sensors initially showed pwm channels at 64% "MANUAL CONTROL," but
+later readings showed the value changing on its own to 128% as temps
+rose — meaning Dell's own EC/BIOS is already dynamically adjusting fan
+speed independent of Linux, not frozen as first assumed. Decided this
+meant manual override probably isn't necessary — held off on forcing
+restricted=0 since the EC already seemed to be managing it correctly.
+i8kutils wasn't available in Arch repos, so installed and enabled
+thermald instead as a general thermal-management safety net.
+
+How:
+- Checked `sensors` output across multiple readings to observe dynamic
+  fan behavior (64% -> 128%, RPM 2800 -> 4600)
+- Ran pwmconfig, got restricted=1 error (documented, not yet overridden)
+- pacman -S thermald && systemctl enable --now thermald
+
+To undo/revert if reattempted later:
+No system state was actually changed here beyond installing thermald —
+if you later do reload dell_smm_hwmon with restricted=0, note that
+here (module option, likely via /etc/modprobe.d/), and how to revert
+(remove the modprobe.d file, reboot).
+
+---
+
+## logind.conf change (power key handling) + live-restart incident
+
+What I changed:
+Changed HandlePowerKey from poweroff to suspend in /etc/systemd/
+logind.conf (kept HandlePowerKeyLongPress=poweroff).
+
+Why:
+Suspected a misfired power-key event was causing unexpected shutdowns
+(one incident: pressed F11 for brightness while screen was locked, PC
+shut off immediately — journalctl showed logind logged "Power key
+pressed short" -> graceful poweroff). Wanted a safety net: if a stray
+power-key event fires again, it suspends instead of shutting down,
+reducing risk of data loss. Note: evtest later showed F11 reliably
+sends the correct brightness scancode on this hardware — root cause of
+the misfire is still unconfirmed/intermittent, this was a precaution,
+not a confirmed fix.
+
+How:
+Edited /etc/systemd/logind.conf, changed HandlePowerKey=suspend.
+
+IMPORTANT — what NOT to do to apply it:
+Do NOT run `sudo systemctl restart systemd-logind` live inside an
+active Hyprland session to apply this. Did this once and it caused a
+black screen + unresponsive TTYs (Ctrl+Alt+F3/F4 didn't work),
+requiring a forced shutdown to recover. Root cause: restarting logind
+live breaks the session/VT/DRM-master handoff under Wayland
+compositors. journalctl confirmed a real crash (X11 connection broke,
+sddm greeter process crashed) directly caused by the live restart.
+
+Correct way to apply logind.conf changes: full reboot, not a live
+service restart.
+
+To undo:
+Revert HandlePowerKey back to poweroff (or remove the line to use
+default) in /etc/systemd/logind.conf, then reboot (not live restart).
