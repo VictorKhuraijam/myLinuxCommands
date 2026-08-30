@@ -1,0 +1,32 @@
+## Bluetooth off by default at boot, toggle turns it on (final fix)
+
+What: Disabled Blueman's autostart entry (was conflicting with the
+      Caelestia bluetooth toggle).
+
+Why: Blueman (a separate bluetooth applet, running via
+     /etc/xdg/autostart/blueman.desktop) was starting alongside
+     Caelestia and enforcing its own remembered "off" state via
+     rfkill on every login — a lower layer than what Caelestia's
+     toggle controls (bluetoothctl power). This meant the Caelestia
+     toggle would flip to "Enabled" in the UI but the radio stayed
+     soft-blocked underneath, since Blueman kept re-blocking it.
+     AutoEnable=false in main.conf was a red herring here — it was
+     previously masking this conflict, not causing it (bluetoothd's
+     aggressive auto-power-on at boot was racing ahead of/overriding
+     Blueman before this setting was touched).
+
+How:
+- mkdir -p ~/.config/autostart
+- cp /etc/xdg/autostart/blueman.desktop ~/.config/autostart/
+- echo 'Hidden=true' >> ~/.config/autostart/blueman.desktop
+- sudo rfkill unblock bluetooth
+- Logged out/in, confirmed app-blueman@autostart.service no longer
+  running and rfkill list shows unblocked with no manual commands
+
+Kept: AutoEnable=false in /etc/bluetooth/main.conf (adapter off by
+      default at boot; Caelestia toggle now correctly turns it on
+      since Blueman is no longer fighting it).
+
+To undo (re-enable Blueman autostart):
+Remove ~/.config/autostart/blueman.desktop (or delete the
+Hidden=true line from it).
