@@ -30,3 +30,103 @@ Kept: AutoEnable=false in /etc/bluetooth/main.conf (adapter off by
 To undo (re-enable Blueman autostart):
 Remove ~/.config/autostart/blueman.desktop (or delete the
 Hidden=true line from it).
+
+
+
+
+SOLID Principles — Quick Overview
+
+SOLID is a set of five object-oriented design principles, but the underlying ideas generalize well beyond OOP:
+
+S — Single Responsibility Principle: A unit of code (class, function, component) should have one reason to change.
+    It should do one thing.
+O — Open/Closed Principle: Code should be open for extension but closed for modification — you should be able to add
+    new behavior without rewriting existing, working code.
+L — Liskov Substitution Principle: A subtype should be usable anywhere its base type is expected, without breaking correctness.
+I — Interface Segregation Principle: Don't force a consumer to depend on methods/props it doesn't use — prefer several small,
+    specific interfaces over one large one.
+D — Dependency Inversion Principle: High-level logic shouldn't depend on low-level implementation details directly — both]
+    should depend on abstractions.
+
+Honest answer: was this bug a SOLID violation?
+
+Not really, directly — and I don't want to force-fit it. The attachment bug wasn't caused by bad class hierarchies or
+tight coupling to concrete implementations. It was an async state management bug: a race condition between an async operation
+(uploadFile()) and a synchronous read of state that assumed the async operation had already finished.
+
+That said, there's one legitimate SOLID-adjacent connection worth naming, plus some more directly relevant design
+principles that actually explain what went wrong.
+
+The one real SOLID connection: Single Responsibility, blurred
+
+handleSubmit had an implicit, undeclared responsibility it wasn't built to hold: knowing whether the form's async
+side-effects had settled. It was written as if its only job was "read formData and send it" — but its actual job also
+included "don't do that if formData isn't done being populated yet." That second responsibility existed nowhere in the code.
+Nothing owned it. That's the SRP-flavored way to describe the gap: a responsibility existed in reality (someone has to know
+whether the form is submittable) but wasn't assigned to any actual piece of code.
+
+The more directly relevant principles
+
+1. Make invalid states unrepresentable.
+Before the fix, the system could be in a state — "form has an attachment field that looks filled but the actual upload
+hasn't finished" — that nothing modeled or checked for. The attachment field was just a string, indistinguishable between
+"genuinely not chosen yet" and "chosen, upload in progress." A more defensive data model would have made those two states
+explicit (e.g., attachment: string | "uploading" | null), so a submit handler couldn't accidentally treat "uploading" as "done."
+
+2. Fail fast / validate at the boundary.
+validate() existed but didn't actually enforce what the UI implied was required (the red asterisk on Attachment). This is a
+classic gap between stated intent (the UI says it's required) and enforced intent (the code that's supposed to check it doesn't).
+Any place where you assert a rule visually should have a matching, actually-executed check — otherwise the assertion is just
+decoration.
+
+3. Don't trust that async operations have completed just because a callback exists.
+The core technical mistake: treating handleFileChange's completion (setting attachment in state) as something that would
+naturally happen before submission, without ever coupling the two. Any time you have "operation A populates data that operation
+B depends on," and A is async while B is a user-triggered action, you need an explicit gate — not implicit trust that the user
+will wait.
+
+How to remind yourself of this in future projects
+
+1. A checklist question for any async-then-user-action pattern:
+
+"Can the user trigger the next step before this async call resolves? If yes, what happens?"
+Ask this specifically whenever you write async function handleX(...) that sets state, and there's a button elsewhere that reads
+that state. This single question would have caught this bug on day one.
+
+2. A personal rule: every async state-setter needs a paired "in-flight" flag.
+
+Whenever you write:
+
+```js
+const handleX = async () => {
+    const result = await someAsyncCall();
+    setSomeState(result);
+};
+```
+Immediately ask: "does anything else depend on someState being current? If so, I need isXInProgress too, and I need to gate
+the dependent action on it." Make this as automatic as remembering to handle the error case.
+
+3. Validation should mirror the UI, not the other way around.
+If a field is marked required in the UI (asterisk, "Required" label), there should be a corresponding, tested line in
+validation logic — not an assumption that the UI prevents bad states by itself. UI is a suggestion to the user; validation
+is the actual guarantee.
+
+4. Treat "no error was thrown" as different from "the operation succeeded."
+The original code had several if (response?.status === 200 && success) { ... } blocks with no else. A cheap, mechanical
+habit: whenever you write an if around an async response, ask "what happens in every other case?" — and write something for it,
+even if it's just a console warning at first.
+
+5. When you find one instance of a bug pattern, grep for the pattern itself, not just the symptom.
+You did this well already in this project — once you found the reimbursement race condition, you searched for
+uploadFile( everywhere and found it in leaves and profile too. That instinct ("this shape of bug probably exists elsewhere") is
+worth keeping as a standing habit, not just a one-off response to this incident.
+
+6. Write yourself a one-line "lesson learned" note per bug you fix.
+Something like a running personal log:
+
+Async upload + separate submit button = race condition unless explicitly locked. Check for this pattern whenever a form has a file
+input and a submit button in different handlers.
+Keeping a short list like this, reviewed occasionally, builds the instinct faster than trying to remember abstract principles
+alone — it's the concrete pattern-recognition that actually prevents repeat mistakes.
+
+
