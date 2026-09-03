@@ -130,3 +130,490 @@ Keeping a short list like this, reviewed occasionally, builds the instinct faste
 alone — it's the concrete pattern-recognition that actually prevents repeat mistakes.
 
 
+
+
+
+Screenshots 󰣇  ❯ systemctl --user status convert-screenshots.service
+● convert-screenshots.service - Convert Caelestia screenshots to JPG
+     Loaded: loaded (/home/victor/.config/systemd/user/convert-screenshots.service; disabled; preset: enabled)
+     Active: active (running) since Thu 2026-09-03 13:07:50 IST; 2s ago
+ Invocation: a323c4bd091c46a7a31311462630cc64
+   Main PID: 29773 (convert_screens)
+      Tasks: 3 (limit: 18914)
+     Memory: 1.3M (peak: 2.2M)
+        CPU: 21ms
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/convert-screenshots.service
+             ├─29773 /bin/bash /home/victor/myScripts/convert_screenshots.sh
+             ├─29776 inotifywait -m /home/victor/.cache/caelestia/screenshots -e close_write
+             └─29777 /bin/bash /home/victor/myScripts/convert_screenshots.sh
+
+Sep 03 13:07:50 HoH systemd[693]: Started Convert Caelestia screenshots to JPG.
+Sep 03 13:07:50 HoH convert_screenshots.sh[29776]: Setting up watches.
+Sep 03 13:07:50 HoH convert_screenshots.sh[29776]: Watches established.
+
+explain the command and the output line by line
+
+
+The command itself
+
+systemctl is the command-line program you use to communicate with systemd, the service manager.
+
+systemctl --user status convert-screenshots.service
+│         │      │
+│         │      └─ which service?
+│         │
+│         └─ show its current status
+│
+└─ communicate with systemd
+
+The important --user means:
+
+Talk to my user's systemd instance, not the system-wide/root systemd instance.
+
+That's appropriate because your service lives at:
+
+~/.config/systemd/user/convert-screenshots.service
+
+rather than something like:
+
+/etc/systemd/system/convert-screenshots.service
+● convert-screenshots.service
+● convert-screenshots.service - Convert Caelestia screenshots to JPG
+
+This tells you the name and description of the unit.
+
+The name comes from the filename:
+
+convert-screenshots.service
+
+The description comes from your service file:
+
+[Unit]
+Description=Convert Caelestia screenshots to JPG
+
+The ● is systemctl's visual status indicator.
+
+Loaded:
+Loaded: loaded (/home/victor/.config/systemd/user/convert-screenshots.service; disabled; preset: enabled)
+
+There are actually several pieces of information here.
+
+loaded
+Loaded: loaded
+
+Systemd successfully found and parsed your .service file.
+
+So your service definition isn't missing.
+
+The path
+/home/victor/.config/systemd/user/convert-screenshots.service
+
+That's the exact service file systemd loaded.
+
+So when you run:
+
+systemctl --user start convert-screenshots.service
+
+systemd is using:
+
+~/.config/systemd/user/convert-screenshots.service
+disabled
+disabled
+
+This often causes confusion.
+
+Disabled does NOT mean stopped.
+
+Your service is currently running.
+
+disabled means:
+
+The service has not been configured to start automatically when your user systemd session reaches the target specified by [Install].
+
+So right now:
+
+Running now?                  YES
+Starts automatically later?  NO
+
+You manually started it.
+
+If you want automatic startup:
+
+systemctl --user enable convert-screenshots.service
+
+Or enable and start in one command:
+
+systemctl --user enable --now convert-screenshots.service
+preset: enabled
+preset: enabled
+
+A preset is systemd/distribution policy about what the default enablement state should be when presets are applied.
+
+It doesn't mean your service is currently enabled.
+
+That's why these can coexist:
+
+disabled; preset: enabled
+
+The important current state is disabled.
+
+Active: active (running)
+Active: active (running) since Thu 2026-09-03 13:07:50 IST; 2s ago
+
+This is one of the most important lines.
+
+active (running)
+
+means systemd successfully started your script and the process is still alive.
+
+That's exactly what you want.
+
+Then:
+
+since Thu 2026-09-03 13:07:50 IST
+
+means the current run started at 1:07:50 PM.
+
+And:
+
+2s ago
+
+means you asked for the status about two seconds after it started.
+
+Invocation:
+Invocation: a323c4bd091c46a7a31311462630cc64
+
+This is a unique identifier systemd assigned to this particular invocation/run of the service.
+
+Think of it like:
+
+convert-screenshots.service
+        │
+        ├── run #1 → ID A
+        │
+        ├── run #2 → ID B
+        │
+        └── current run → a323c4bd...
+
+It's mostly useful for systemd's logging and diagnostics. You generally don't need to care about it for everyday use.
+
+Main PID
+Main PID: 29773 (convert_screens)
+
+PID means Process ID.
+
+Linux gives every running process a number.
+
+Your main script currently has:
+
+PID = 29773
+
+So systemd considers process 29773 the main process belonging to this service.
+
+You could inspect it yourself:
+
+ps -p 29773
+
+The (convert_screens) part is the displayed process/command name, truncated to fit.
+
+Tasks: 3
+Tasks: 3 (limit: 18914)
+
+Your service currently has 3 processes/tasks associated with it.
+
+That initially might seem strange:
+
+"I only started one Bash script. Why are there three?"
+
+The answer appears a few lines later:
+
+├─29773 /bin/bash ...convert_screenshots.sh
+├─29776 inotifywait ...
+└─29777 /bin/bash ...convert_screenshots.sh
+
+Your Bash pipeline creates multiple processes.
+
+We'll get to that shortly.
+
+The:
+
+limit: 18914
+
+means your service/user slice is allowed far more tasks than the three it's currently using. Nothing concerning there.
+
+Memory
+Memory: 1.3M (peak: 2.2M)
+
+Currently, the service accounts for roughly:
+
+1.3 MB
+
+of memory.
+
+At its highest point during this run, it used roughly:
+
+2.2 MB
+
+That's tiny.
+
+CPU
+CPU: 21ms
+
+The processes belonging to this service have consumed about 21 milliseconds of CPU time so far.
+
+This illustrates why inotifywait is useful.
+
+Your script isn't doing:
+
+Check directory
+Check directory
+Check directory
+Check directory
+Check directory
+...
+
+constantly.
+
+Instead, it can spend most of its time sleeping/waiting until the kernel reports a filesystem event. So while no screenshots are being taken, CPU usage should be negligible.
+
+CGroup
+
+Now we get to an important systemd/Linux concept:
+
+CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/convert-screenshots.service
+
+CGroup means control group.
+
+Systemd uses Linux cgroups to group the processes belonging to a service together.
+
+Conceptually:
+
+Your user
+   │
+   └── systemd --user
+          │
+          └── convert-screenshots.service
+                    │
+                    ├── bash
+                    ├── inotifywait
+                    └── bash
+
+This is very useful.
+
+Systemd doesn't merely remember:
+
+"I launched PID 29773."
+
+It can keep track of the whole group of processes created by the service.
+
+For example, when you run:
+
+systemctl --user stop convert-screenshots.service
+
+systemd can stop the processes belonging to the service rather than leaving inotifywait running accidentally.
+
+The three processes
+
+This is probably the most interesting part:
+
+├─29773 /bin/bash /home/victor/myScripts/convert_screenshots.sh
+├─29776 inotifywait -m /home/victor/.cache/caelestia/screenshots -e close_write
+└─29777 /bin/bash /home/victor/myScripts/convert_screenshots.sh
+
+Remember this part of your script:
+
+inotifywait -m "$TARGET_DIR" -e close_write | while read -r path action file; do
+    ...
+done
+
+That's a pipeline:
+
+inotifywait ... | while ...
+
+The pipe | connects two commands.
+
+Conceptually:
+
+                 PIPE
+                   │
+inotifywait ───────┼──────► while read ...
+     │                         │
+ produces                     reads
+ events                       events
+PID 29773
+29773 /bin/bash /home/victor/myScripts/convert_screenshots.sh
+
+This is the main Bash process running your script.
+
+It's the process systemd originally started through your:
+
+ExecStart=%h/myScripts/convert_screenshots.sh
+PID 29776
+29776 inotifywait -m /home/victor/.cache/caelestia/screenshots -e close_write
+
+This is the actual inotifywait process.
+
+It is currently watching:
+
+/home/victor/.cache/caelestia/screenshots
+
+for:
+
+close_write
+
+events.
+
+The -m means:
+
+Keep monitoring instead of exiting after the first event.
+
+So most of the time PID 29776 is just sitting there waiting for the Linux kernel to tell it:
+
+A file that was opened for writing has now been closed.
+
+PID 29777
+29777 /bin/bash /home/victor/myScripts/convert_screenshots.sh
+
+This second Bash process is related to the right side of your pipeline:
+
+while read -r path action file; do
+    ...
+done
+
+Bash commonly runs pipeline components in separate processes/subshells.
+
+So you effectively have:
+
+              systemd
+                 │
+                 ▼
+        Bash — main script
+             PID 29773
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+   inotifywait          Bash
+    PID 29776          PID 29777
+        │                 │
+        │    pipe         │
+        └────────────────►│
+                          │
+                     while read
+
+This is why seeing three tasks is normal.
+
+The journal messages
+
+Finally:
+
+Sep 03 13:07:50 HoH systemd[693]: Started Convert Caelestia screenshots to JPG.
+
+This is a log entry from systemd.
+
+Breaking it down:
+
+Sep 03 13:07:50
+
+Timestamp.
+
+HoH
+
+Your machine's hostname.
+
+systemd[693]
+
+The process producing the log message is your user systemd instance, whose PID is 693.
+
+And:
+
+Started Convert Caelestia screenshots to JPG.
+
+means systemd successfully started your service.
+
+Then:
+
+Sep 03 13:07:50 HoH convert_screenshots.sh[29776]: Setting up watches.
+
+This came from PID 29776, which we already know is:
+
+inotifywait
+
+inotifywait is telling you:
+
+I'm setting up the filesystem watch you requested.
+
+Then:
+
+Sep 03 13:07:50 HoH convert_screenshots.sh[29776]: Watches established.
+
+means:
+
+The watch is ready. I'm now waiting for events.
+
+At this point your system is essentially sitting here:
+
+systemd
+   │
+   │ manages
+   ▼
+convert_screenshots.sh
+   │
+   ├──── inotifywait
+   │          │
+   │          ▼
+   │       WAITING...
+   │
+   └──── while read
+              │
+              ▼
+           WAITING...
+
+Then you take a screenshot.
+
+Caelestia writes screenshot
+             │
+             ▼
+Linux filesystem
+             │
+             │ CLOSE_WRITE
+             ▼
+        inotifywait
+             │
+             │ sends filename through |
+             ▼
+         while read
+             │
+             ▼
+      extensionless file?
+             │
+            YES
+             ▼
+          magick
+             │
+             ▼
+       screenshot.jpg
+
+And because we discovered that your Caelestia screenshot directory resolves to the same physical directory as ~/Pictures/Screenshots, your new filename filter is important: the resulting .jpg must be ignored when its own close_write event occurs.
+
+One remaining thing
+
+Everything is currently working, but this line:
+
+Loaded: ... disabled ...
+
+means it won't automatically start just because it's currently running.
+
+Once you've taken a few screenshots and confirmed your .jpg filtering fixed the recursion, you can enable automatic startup with:
+
+systemctl --user enable convert-screenshots.service
+
+Then you get both:
+
+Active: active (running)   ← running right now
+Enabled                    ← automatically started in future sessions
+
+That's the point where systemd fully takes over managing your screenshot watcher for you.
+
+
+
+
