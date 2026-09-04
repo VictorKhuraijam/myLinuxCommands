@@ -45,3 +45,28 @@ sudo systemctl restart systemd-logind
     your applications.Bookmark any critical web browser tabs.Make sure you are not running any long-term terminal scripts
     or file transfers in the background.
 
+
+
+docker exec -i mysql-dev mysql -u root futureglow_prod < ~/Downloads/futureglow_hrm_02-09-26.sql
+
+    This command imports the database backup file from your local computer directly into the MySQL database running inside your Docker
+    container, completely bypassing the password prompt.
+    Here is the exact breakdown of what each part of that command does:
+      1. The Docker Execution Part
+        docker exec: Tells Docker to run a command inside an already running container.
+        -i (Interactive): Keeps the input stream (stdin) open. This is the magic flag that allows your local computer to send
+                          data into the container.
+        mysql-dev: The specific name of your targeted MySQL Docker container.
+
+      2. The Internal MySQL Part
+         mysql: Launches the command-line MySQL client interface inside the container.
+         -u root: Logs in as the root administrator user.
+         (No -p flag): By omitting -p, it tells MySQL to log in without a password (a blank password), which is
+         common for local development environments.
+         futureglow_prod: Specifies the target database name where all the incoming tables and rows will be created.
+
+      3. The Data Redirection Part
+         < (Input Redirection operator): This takes the contents of the file on the right and pipes it into the command on the left.
+         ~/Downloads/futureglow_hrm_02-09-26.sql: The file path to your production database dump file located in your local
+         user's Downloads directory.
+
