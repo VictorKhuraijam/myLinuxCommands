@@ -46,27 +46,55 @@ sudo systemctl restart systemd-logind
     or file transfers in the background.
 
 
+systemctl is-active
+    systemctl is-active command checks whether a specific system service or background process is currently running and operational
+    on your Linux machine.
+    e.g.  systemctl is-active docker
+          The Outputs:
+            active: The service is running fine right now.
+            inactive: The service is completely stopped.
+            failed: The service crashed or failed to start due to an error.
 
-docker exec -i mysql-dev mysql -u root futureglow_prod < ~/Downloads/futureglow_hrm_02-09-26.sql
 
-    This command imports the database backup file from your local computer directly into the MySQL database running inside your Docker
-    container, completely bypassing the password prompt.
-    Here is the exact breakdown of what each part of that command does:
-      1. The Docker Execution Part
-        docker exec: Tells Docker to run a command inside an already running container.
-        -i (Interactive): Keeps the input stream (stdin) open. This is the magic flag that allows your local computer to send
-                          data into the container.
-        mysql-dev: The specific name of your targeted MySQL Docker container.
+sudo tee /etc/docker/daemon.json << 'EOF'
+{
+  "data-root": "/home/docker-data"
+}
+EOF
+   The tee command reads data from standard input (your terminal) and writes it to two places at once: it prints it to
+   your screen and saves it into a file. The name comes from a physical plumbing T-splitter (Tee), because it
+   splits a single stream of data into two separate directions.The tee command reads data from standard input (your terminal)
+   and writes it to two places at once: it prints it to your screen and saves it into a file. The name comes from a physical
+   plumbing T-splitter (Tee), because it splits a single stream of data into two separate directions.
 
-      2. The Internal MySQL Part
-         mysql: Launches the command-line MySQL client interface inside the container.
-         -u root: Logs in as the root administrator user.
-         (No -p flag): By omitting -p, it tells MySQL to log in without a password (a blank password), which is
-         common for local development environments.
-         futureglow_prod: Specifies the target database name where all the incoming tables and rows will be created.
+   The above command uses tee combined with sudo and a text block (<< 'EOF' ... EOF) to safely write configuration
+   settings into a protected system file.
+   Here is the exact step-by-step breakdown:
+   << 'EOF' ... EOF (Here-Doc): This groups all the text inside the block (the JSON data configuration) and feeds it into
+   the tee command as input.
+   sudo tee: Runs the writer process with root privileges.
+   /etc/docker/daemon.json: This is a protected system folder. Normal terminal commands like
+   echo "{...}" > /etc/docker/daemon.json will fail with a "Permission Denied" error—even if you put sudo at the very
+   front—because the redirection arrow (>) is executed by your standard shell user, not root.
+   sudo tee completely bypasses this limitation.
 
-      3. The Data Redirection Part
-         < (Input Redirection operator): This takes the contents of the file on the right and pipes it into the command on the left.
-         ~/Downloads/futureglow_hrm_02-09-26.sql: The file path to your production database dump file located in your local
-         user's Downloads directory.
+sudo du -sh /var/lib/docker.old
+   The sudo du -sh command tells you exactly how much disk space a specific file or folder is taking up on your hard
+   drive, running with administrator privileges so it doesn't get blocked.
+   Here is the exact piece-by-piece breakdown of how it works:
+   1. The Permissions Part
+       sudo (Superuser Do): Runs the command as the root administrator. This is absolutely necessary when
+       checking system directories (like /var/lib/docker.old), because normal users are blocked from looking inside them for
+       security reasons. Without sudo, the command would spit out hundreds of "Permission Denied" errors.
+   2. The Core Command
+       du (Disk Usage): This is the core utility tool. Its only job is to measure the space occupied by
+       files and directories on your Linux file system.
+   3. The Option Flags
+      -s (Summary): Tells the tool to give you just the final total size of the folder. Without this flag,
+       du will print every single file, subfolder, and image layer inside that directory on a separate line, creating a massive
+       wall of text.
+       -h (Human-readable): Converts raw blocks into clean, universal units that humans can understand instantly. Instead of
+       showing a confusing raw number like 42894336 (bytes), it automatically adds format labels like 41G (Gigabytes) or
+       350M (Megabytes).
+
 

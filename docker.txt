@@ -1,0 +1,48 @@
+docker exec -i mysql-dev mysql -u root futureglow_prod < ~/Downloads/futureglow_hrm_02-09-26.sql
+
+    This command imports the database backup file from your local computer directly into the MySQL database running inside your
+    Docker container, completely bypassing the password prompt.
+    Here is the exact breakdown of what each part of that command does:
+      1. The Docker Execution Part
+        docker exec: Tells Docker to run a command inside an already running container.
+        -i (Interactive): Keeps the input stream (stdin) open. This is the magic flag that allows your local computer to send
+                          data into the container.
+        mysql-dev: The specific name of your targeted MySQL Docker container.
+
+      2. The Internal MySQL Part
+         mysql: Launches the command-line MySQL client interface inside the container.
+         -u root: Logs in as the root administrator user.
+         (No -p flag): By omitting -p, it tells MySQL to log in without a password (a blank password), which is
+         common for local development environments.
+         futureglow_prod: Specifies the target database name where all the incoming tables and rows will be created.
+
+      3. The Data Redirection Part
+         < (Input Redirection operator): This takes the contents of the file on the right and pipes it into the command on the left.
+         ~/Downloads/futureglow_hrm_02-09-26.sql: The file path to your production database dump file located in your local
+         user's Downloads directory.
+
+
+docker exec -i mysql-dev sh -c 'exec mysql -u root -p"$MYSQL_ROOT_PASSWORD" futureglow_prod' < ~/Downloads/futureglow_hrm_07-09-26.sql
+
+    This command pipes your local backup data straight into MySQL by forcing the container to look up its own password,
+    completely bypassing the need for you to type anything manually.
+    Here is the exact piece-by-piece breakdown of how it works:
+      1. The Docker Boundary Layer
+        * docker exec -i mysql-dev: Tells Docker to run a command inside your running mysql-dev container. The -i (Interactive)
+         flag keeps the intake stream open so your local .sql file data can flow into the container.
+      2. The Internal Shell Wrap
+        * sh -c '...': This launches a standard system shell (sh) inside the container to execute the code within the single
+         quotes. This is the key trick: it forces the environment variables to be read from inside the container rather than
+         from your local Arch system.
+      3. The MySQL Execution & Login
+        * exec mysql: Tells the internal shell to drop everything else and execute the MySQL database utility.
+        * -u root: Logs into the database server as the root administrator.
+        * -p"$MYSQL_ROOT_PASSWORD": This is the magic shortcut. The container reads the hidden variable $MYSQL_ROOT_PASSWORD
+         (which was set when you first created the container) and feeds it directly into the password flag. Putting it inside
+         double quotes ensures special characters don't break the string.
+      4. The Target & The Source
+        * futureglow_prod: Tells MySQL exactly which database schema to write the incoming data into.
+        * < ~/Downloads/futureglow_hrm_07-09-26.sql: The input redirection operator (<) grabs the backup file from your local Downloads
+         folder and streams it right across the terminal boundary into the MySQL client.
+
+
