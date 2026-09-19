@@ -97,4 +97,21 @@ sudo du -sh /var/lib/docker.old
        showing a confusing raw number like 42894336 (bytes), it automatically adds format labels like 41G (Gigabytes) or
        350M (Megabytes).
 
+sudo systemctl list-units --type=service --state=running
+   This command lists all system services that are currently active and running on your Linux system right now.
+   Here is a breakdown of what each part of the command does:
+     sudo: Runs the command with root (administrator) privileges. (Note: You actually don't need sudo just to list units;
+     running it as a normal user works fine too!)
+     systemctl: The core management utility used to control the systemd init system and inspect background processes.
+     list-units: Tells systemctl to output a list of all its managed objects (daemons, sockets, paths, timers, etc.).
+     --type=service: Filters the list so it only shows software services (background daemons like your Docker engine,
+                     SSH server, database, or firewalls), ignoring other types of system units like hardware device configurations or mount points.
+     --state=running: Further filters the list so it only shows services actively executing code at this exact moment.
+                      It hides services that are stopped, crashed, or completed successfully.
 
+What the Output Columns MeanWhen you run it, you will see a clean table with five columns:
+    UNIT: The system name of the service (e.g., docker.service, sshd.service).
+    LOAD: Confirms if the system configuration file was loaded into memory correctly (loaded).
+    ACTIVE: The high-level status (it should say active for everything in this list).
+    SUB: The specific low-level state (it will say running since you filtered for it).
+    DESCRIPTION: A short human-readable summary explaining what the service actually does.
