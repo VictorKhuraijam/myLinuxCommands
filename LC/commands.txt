@@ -1,0 +1,15 @@
+jq empty ~/.config/caelestia/shell.json
+   jq is a lightweight command-line tool for reading, validating, filtering, and modifying JSON (JavaScript Object Notation) data.
+   Think of it like grep, sed, or awk, but specifically designed for JSON.
+
+    Here's what each part means:
+
+    jq	                                         Runs the JSON processor
+    empty                                        A jq filter that produces no output
+    ~	                                           Your home directory
+    ~/.config/caelestia/shell.json	             Your Caelestia configuration file
+
+What happens when you execute it?
+jq reads your JSON file, parses it, and checks whether the syntax is valid.
+If the JSON is valid, it prints nothing and exits successfully.
+If the JSON contains an error, such as a missing comma, it prints an error message.

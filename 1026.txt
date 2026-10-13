@@ -1,0 +1,19 @@
+pw-loopback -m "Echo-cancelled source"
+
+Acts like a real-time monitor for your microphone. It intercepts the processed audio coming out of your clean, echo-cancelled
+virtual microphone feed and routes it directly back into your own speakers or headphones so you can hear exactly what you sound
+like in real-time.
+Breaking down exactly how it works piece by piece:
+• pw-loopback: This is a built-in PipeWire utility. Its sole job is to create a digital "bridge" between an audio input
+device (like a microphone) and an audio output device (like your speakers or headphones).
+• -m (or --menu): This flag instructs PipeWire to route the audio explicitly using a named media role or a specific targeted
+profile mapping.
+• "Echo-cancelled source": This is the exact name of the clean, filtered virtual microphone filter we configured back in Step 1.
+
+Why we use it for testing
+
+Normally, you can't hear your own microphone unless you are actively recorded or inside an official call app. Running
+this command lets you safely test your microphone's clarity, volume balance, and background noise level locally on your Arch
+machine before hopping onto a real video call with another person.
+Note: Remember to close it out by pressing Ctrl + C in your terminal when you are done testing, or you will continue to
+hear your own voice over your speakers!
