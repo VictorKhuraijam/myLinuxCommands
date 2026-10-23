@@ -12,6 +12,7 @@ sudo rfkill unblock bluetooth
     That command will instantly unblock your Bluetooth device at the kernel level.If you are running this command
     because your Bluetooth adapter is still not connecting or showing up, execute this punchy sequence of system commands to
     completely restart and wake up the Bluetooth stack:bash
+
       # 1. Restart the background Bluetooth service
     sudo systemctl restart bluetooth
 
